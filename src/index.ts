@@ -51,9 +51,20 @@ async function fetchMarketBoardData(item: any, server_id: number, ctx: Context):
 }
 
 export function apply(ctx: Context) {
+  ctx.command('查询')
+  .usage('查询 item_name server_name\nitem_name：道具名，可以部分\nserver_name：服务器名，非大区名')
+  .example('查询 失传碎晶 神意之地')
+  .example('查询 英雄失传碎晶 神意之地')
+  ;
   // write your plugin here
   ctx.command('查询 <item_name> <server_name>')
     .action((argv, item_name, server_name) => {
+      if (!item_name) {
+        return '未指定物品名';
+      }
+      if (!server_name) {
+        return '未指定服务器';
+      }
       const server = servers.find((server) => server.name == server_name);
       if (!server) {
         return '服务器不存在';

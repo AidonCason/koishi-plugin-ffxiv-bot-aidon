@@ -52,10 +52,10 @@ async function fetchMarketBoardData(item: any, server_id: number, ctx: Context):
 
 export function apply(ctx: Context) {
   ctx.command('查询')
-  .usage('查询 item_name server_name\nitem_name：道具名，可以部分\nserver_name：服务器名，非大区名')
-  .example('查询 失传碎晶 神意之地')
-  .example('查询 英雄失传碎晶 神意之地')
-  ;
+    .usage('查询 item_name server_name\nitem_name：道具名，可以部分\nserver_name：服务器名，非大区名')
+    .example('查询 失传碎晶 神意之地')
+    .example('查询 英雄失传碎晶 神意之地')
+    ;
   // write your plugin here
   ctx.command('查询 <item_name> <server_name>')
     .action((argv, item_name, server_name) => {
@@ -78,14 +78,14 @@ export function apply(ctx: Context) {
             // 出售列表
             const listings = [...data?.listings]
               .map((value) =>
-                `  ${value.pricePerUnit.toLocaleString()} x ${value.quantity.toLocaleString()} ${value.retainerName} ` +
+                `  ${value.pricePerUnit.toLocaleString()} x ${value.quantity.toLocaleString()}${value.hq ? '(HQ)' : ''} ${value.retainerName} ` +
                 `总价：${value.total.toLocaleString()} 手续费：${value.tax.toLocaleString()} ` +
                 `更新时间：${new Date(value.lastReviewTime * 1000).toLocaleString()}`)
               .join("\n");
             // 购买历史
             const recent_histroy = [...data?.recentHistory]
               .map((value) =>
-                `  ${value.pricePerUnit.toLocaleString()} x ${value.quantity.toLocaleString()} ${value.buyerName} ` +
+                `  ${value.pricePerUnit.toLocaleString()} x ${value.quantity.toLocaleString()}${value.hq ? '(HQ)' : ''} ${value.buyerName} ` +
                 `总价：${value.total.toLocaleString()} ` +
                 `时间：${new Date(value.timestamp * 1000).toLocaleString()}`)
               .join("\n");

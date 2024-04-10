@@ -1,7 +1,7 @@
 {
   "name": "koishi-plugin-ffxiv-bot-aidon",
   "description": "FF14bot，物价查询",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
   "files": [
@@ -17,11 +17,25 @@
   "contributors": [
     "aidon <silverblade999@outlook.com>"
   ],
+  "homepage": "https://github.com/AidonCason/koishi-plugin-ffxiv-bot-aidon",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/AidonCason/koishi-plugin-ffxiv-bot-aidon"
+    "url": "git+https://github.com/AidonCason/koishi-plugin-ffxiv-bot-aidon.git"
   },
   "peerDependencies": {
     "koishi": "^4.17.4"
+  },
+  "koishi": {
+    "description": {
+      "zh": "FF14bot，物价查询"
+    },
+    "service": {
+      "required": [],
+      "optional": [],
+      "implements": []
+    },
+    "locales": [
+      "zh"
+    ]
   }
 }

@@ -81,16 +81,14 @@ function fetchWorldNameAndDataCenterName(world_name_inline: string, world_name_q
 }
 
 export function apply(ctx: Context) {
-  ctx.command('查询')
+  // write your plugin here
+  ctx.command('查询 <item_name> <server_name> [num1:number] [num2:number]')
     .usage('查询 物品名 服务器名 条数 历史条数 \nitem_name：道具名，可以部分\nserver_name：大区名或服务器名或地区')
     .example('查询 英雄失传碎晶 神意之地')
     .example('查询 英雄失传碎晶 神意之地')
     .example('查询 英雄失传碎晶 陆行鸟')
     .example('查询 英雄失传碎晶 中国')
     .example('查询 英雄失传碎晶 神意之地 5 5')
-    ;
-  // write your plugin here
-  ctx.command('查询 <item_name> <server_name> [num1:number] [num2:number]')
     .action((argv, item_name, server_name, num1, num2) => {
       logger.debug(argv);
       const _num1 = isInteger((Number)(num1)) && num1 > 0 && num1 <= 10 ? num1 : ctx.config.listing_num;
@@ -131,7 +129,7 @@ export function apply(ctx: Context) {
                 `  ${value.pricePerUnit.toLocaleString()} x ${value.quantity.toLocaleString()}${value.hq ? '(HQ)' : ''} ` +
                 `${value.retainerName}${fetchWorldNameAndDataCenterName(value.worldName, data.worldName, server.all_mode)} ` +
                 `总价/手续费：${value.total.toLocaleString()}/${value.tax.toLocaleString()} ` +
-                `时间：${new Date(value.lastReviewTime * 1000).toLocaleString('chinese', { hour12: false })}`)
+                `时间：${new Date(value.lastReviewTime * 1000).toLocaleString('zh-CN', { hour12: false })}`)
               .join("\n");
             // 购买历史
             const recent_histroy = [...data?.recentHistory]
@@ -139,7 +137,7 @@ export function apply(ctx: Context) {
                 `  ${value.pricePerUnit.toLocaleString()} x ${value.quantity.toLocaleString()}${value.hq ? '(HQ)' : ''} ` +
                 `${value.buyerName}${fetchWorldNameAndDataCenterName(value.worldName, data.worldName, server.all_mode)} ` +
                 `总价：${value.total.toLocaleString()} ` +
-                `时间：${new Date(value.timestamp * 1000).toLocaleString()}`)
+                `时间：${new Date(value.timestamp * 1000).toLocaleString('zh-CN', { hour12: false })}`)
               .join("\n");
             // 输出消息
             const result = `` +

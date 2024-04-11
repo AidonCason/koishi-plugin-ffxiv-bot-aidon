@@ -1,10 +1,15 @@
-import { Context, Logger, Schema, Time } from 'koishi'
+import { Context, Logger, Schema, isInteger } from 'koishi'
 
 export const name = 'ffxiv-bot-aidon'
 
-export interface Config { }
+export interface Config {
 
-export const Config: Schema<Config> = Schema.object({})
+}
+
+export const Config: Schema<Config> = Schema.object({
+  listing_num: Schema.number().default(5).min(1).max(10).step(1).description('默认列表条数'),
+  history_num: Schema.number().default(5).min(1).max(10).step(1).description('默认历史条数'),
+})
 
 // universalis api
 const universalis_host = 'https://universalis.app';
@@ -12,86 +17,133 @@ const data_centers_api_url = '/api/v2/data-centers';
 const worlds_api_url = '/api/v2/worlds';
 const market_board_api_url = '/api/v2/{worldDcRegion}/{itemIds}';
 // xivapi
-const xivapi_host = 'https://cafemaker.wakingsands.com';
+const xivapi_cn_host = 'https://cafemaker.wakingsands.com';
+// xivapi 国际服
+const xivapi_host = 'https://xivapi.com';
 const search_api_url = '/search';
 
 const logger = new Logger('fxiv-bot-aidon');
 
+// 数据中心列表
+const data_center_all = [{ "name": "Elemental", "region": "Japan", "worlds": [45, 49, 50, 58, 68, 72, 90, 94] }, { "name": "Gaia", "region": "Japan", "worlds": [43, 46, 51, 59, 69, 76, 92, 98] }, { "name": "Mana", "region": "Japan", "worlds": [23, 28, 44, 47, 48, 61, 70, 96] }, { "name": "Aether", "region": "North-America", "worlds": [40, 54, 57, 63, 65, 73, 79, 99] }, { "name": "Primal", "region": "North-America", "worlds": [35, 53, 55, 64, 77, 78, 93, 95] }, { "name": "Chaos", "region": "Europe", "worlds": [39, 71, 80, 83, 85, 97, 400, 401] }, { "name": "Light", "region": "Europe", "worlds": [33, 36, 42, 56, 66, 67, 402, 403] }, { "name": "Crystal", "region": "North-America", "worlds": [34, 37, 41, 62, 74, 75, 81, 91] }, { "name": "Materia", "region": "Oceania", "worlds": [21, 22, 86, 87, 88] }, { "name": "Meteor", "region": "Japan", "worlds": [24, 29, 30, 31, 32, 52, 60, 82] }, { "name": "Dynamis", "region": "North-America", "worlds": [404, 405, 406, 407] }, { "name": "NA Cloud DC (Beta)", "region": "NA-Cloud-DC", "worlds": [3000, 3001] }, { "name": "陆行鸟", "region": "中国", "worlds": [1167, 1081, 1042, 1044, 1060, 1173, 1174, 1175] }, { "name": "莫古力", "region": "中国", "worlds": [1172, 1076, 1171, 1170, 1113, 1121, 1166, 1176] }, { "name": "猫小胖", "region": "中国", "worlds": [1043, 1169, 1106, 1045, 1177, 1178, 1179] }, { "name": "豆豆柴", "region": "中国", "worlds": [1192, 1183, 1180, 1186, 1201, 1068, 1064, 1187] }, { "name": "한국", "region": "한국", "worlds": [2075, 2076, 2077, 2078, 2080] }];
+// 数据中心名
+const data_center_name_map = new Map<string, boolean>(data_center_all.map(data_center => [data_center.name, data_center.region === "中国"]));
+// 地区名
+const region_name_map = new Map<string, boolean>(data_center_all.map(data_center => [data_center.region, data_center.region === "中国"]));
+const world_center_map = new Map<number, { id: number, data_center_name: string, cn: boolean }>(data_center_all
+  .map(data_center => data_center.worlds.map<[number, { id: number, data_center_name: string, cn: boolean }]>(world => [world, { id: world, data_center_name: data_center.name, cn: data_center.region === "中国" }]))
+  .reduce((acc, worlds) => [...acc, ...worlds]));
 // 服务器列表，不怎么变动所以先写死
 const servers = [{ "id": 21, "name": "Ravana" }, { "id": 22, "name": "Bismarck" }, { "id": 23, "name": "Asura" }, { "id": 24, "name": "Belias" }, { "id": 28, "name": "Pandaemonium" }, { "id": 29, "name": "Shinryu" }, { "id": 30, "name": "Unicorn" }, { "id": 31, "name": "Yojimbo" }, { "id": 32, "name": "Zeromus" }, { "id": 33, "name": "Twintania" }, { "id": 34, "name": "Brynhildr" }, { "id": 35, "name": "Famfrit" }, { "id": 36, "name": "Lich" }, { "id": 37, "name": "Mateus" }, { "id": 39, "name": "Omega" }, { "id": 40, "name": "Jenova" }, { "id": 41, "name": "Zalera" }, { "id": 42, "name": "Zodiark" }, { "id": 43, "name": "Alexander" }, { "id": 44, "name": "Anima" }, { "id": 45, "name": "Carbuncle" }, { "id": 46, "name": "Fenrir" }, { "id": 47, "name": "Hades" }, { "id": 48, "name": "Ixion" }, { "id": 49, "name": "Kujata" }, { "id": 50, "name": "Typhon" }, { "id": 51, "name": "Ultima" }, { "id": 52, "name": "Valefor" }, { "id": 53, "name": "Exodus" }, { "id": 54, "name": "Faerie" }, { "id": 55, "name": "Lamia" }, { "id": 56, "name": "Phoenix" }, { "id": 57, "name": "Siren" }, { "id": 58, "name": "Garuda" }, { "id": 59, "name": "Ifrit" }, { "id": 60, "name": "Ramuh" }, { "id": 61, "name": "Titan" }, { "id": 62, "name": "Diabolos" }, { "id": 63, "name": "Gilgamesh" }, { "id": 64, "name": "Leviathan" }, { "id": 65, "name": "Midgardsormr" }, { "id": 66, "name": "Odin" }, { "id": 67, "name": "Shiva" }, { "id": 68, "name": "Atomos" }, { "id": 69, "name": "Bahamut" }, { "id": 70, "name": "Chocobo" }, { "id": 71, "name": "Moogle" }, { "id": 72, "name": "Tonberry" }, { "id": 73, "name": "Adamantoise" }, { "id": 74, "name": "Coeurl" }, { "id": 75, "name": "Malboro" }, { "id": 76, "name": "Tiamat" }, { "id": 77, "name": "Ultros" }, { "id": 78, "name": "Behemoth" }, { "id": 79, "name": "Cactuar" }, { "id": 80, "name": "Cerberus" }, { "id": 81, "name": "Goblin" }, { "id": 82, "name": "Mandragora" }, { "id": 83, "name": "Louisoix" }, { "id": 85, "name": "Spriggan" }, { "id": 86, "name": "Sephirot" }, { "id": 87, "name": "Sophia" }, { "id": 88, "name": "Zurvan" }, { "id": 90, "name": "Aegis" }, { "id": 91, "name": "Balmung" }, { "id": 92, "name": "Durandal" }, { "id": 93, "name": "Excalibur" }, { "id": 94, "name": "Gungnir" }, { "id": 95, "name": "Hyperion" }, { "id": 96, "name": "Masamune" }, { "id": 97, "name": "Ragnarok" }, { "id": 98, "name": "Ridill" }, { "id": 99, "name": "Sargatanas" }, { "id": 400, "name": "Sagittarius" }, { "id": 401, "name": "Phantom" }, { "id": 402, "name": "Alpha" }, { "id": 403, "name": "Raiden" }, { "id": 404, "name": "Marilith" }, { "id": 405, "name": "Seraph" }, { "id": 406, "name": "Halicarnassus" }, { "id": 407, "name": "Maduin" }, { "id": 3000, "name": "Cloudtest01" }, { "id": 3001, "name": "Cloudtest02" }, { "id": 1167, "name": "红玉海" }, { "id": 1081, "name": "神意之地" }, { "id": 1042, "name": "拉诺西亚" }, { "id": 1044, "name": "幻影群岛" }, { "id": 1060, "name": "萌芽池" }, { "id": 1173, "name": "宇宙和音" }, { "id": 1174, "name": "沃仙曦染" }, { "id": 1175, "name": "晨曦王座" }, { "id": 1172, "name": "白银乡" }, { "id": 1076, "name": "白金幻象" }, { "id": 1171, "name": "神拳痕" }, { "id": 1170, "name": "潮风亭" }, { "id": 1113, "name": "旅人栈桥" }, { "id": 1121, "name": "拂晓之间" }, { "id": 1166, "name": "龙巢神殿" }, { "id": 1176, "name": "梦羽宝境" }, { "id": 1043, "name": "紫水栈桥" }, { "id": 1169, "name": "延夏" }, { "id": 1106, "name": "静语庄园" }, { "id": 1045, "name": "摩杜纳" }, { "id": 1177, "name": "海猫茶屋" }, { "id": 1178, "name": "柔风海湾" }, { "id": 1179, "name": "琥珀原" }, { "id": 1192, "name": "水晶塔" }, { "id": 1183, "name": "银泪湖" }, { "id": 1180, "name": "太阳海岸" }, { "id": 1186, "name": "伊修加德" }, { "id": 1201, "name": "红茶川" }, { "id": 1068, "name": "黄金谷" }, { "id": 1064, "name": "月牙湾" }, { "id": 1187, "name": "雪松原" }, { "id": 2075, "name": "카벙클" }, { "id": 2076, "name": "초코보" }, { "id": 2077, "name": "모그리" }, { "id": 2078, "name": "톤베리" }, { "id": 2080, "name": "펜리르" }];
+const servers_map = new Map<string, { id: number, cn: boolean }>(servers.map((server) => [server.name, { id: server.id, cn: world_center_map.has(server.id) }]));
 
 
 // 查询物品id
-async function fetchItemId(item_name: string, ctx: Context): Promise<any> {
-  const url = xivapi_host + '/search';
+async function fetchItemId(item_name: string, cn: boolean, ctx: Context): Promise<any> {
+  const url = (cn ? xivapi_cn_host : xivapi_host) + '/search';
+  logger.info('url: ' + JSON.stringify(url));
   const res = await ctx.http.get(url, {
     params: {
       indexes: 'Item', // 固定，搜索物品
       'string': item_name, // 物品名称
     }
   });
-  // logger.info('fetchItemId: ' + JSON.stringify(res));
+  logger.debug('fetchItemId: ' + JSON.stringify(res));
   return res?.Results[0];
 }
 
 // 查询物品市场状态
-async function fetchMarketBoardData(item: any, server_id: number, ctx: Context): Promise<any> {
-  logger.info('item: ' + JSON.stringify(item));
-  const url = universalis_host + market_board_api_url.replace("{worldDcRegion}", '' + server_id).replace("{itemIds}", item.ID);
-  logger.info('url: ' + JSON.stringify(url));
+async function fetchMarketBoardData(item: any, server_name: number | string, ln: number, hn: number, ctx: Context): Promise<any> {
+  logger.debug('item: ' + JSON.stringify(item));
+  const url = universalis_host + market_board_api_url.replace("{worldDcRegion}", `${server_name}`).replace("{itemIds}", item.ID);
+  logger.debug('url: ' + JSON.stringify(url));
   const res = await ctx.http.get(url, {
     params: {
-      listings: 5, // 列表大小
-      entries: 5, // 历史大小
+      listings: ln, // 列表大小
+      entries: hn, // 历史大小
       hq: null, // 是否hq
     }
   });
-  // logger.info('fetchMarketBoardData: ' + JSON.stringify(res));
+  logger.debug('fetchMarketBoardData: ' + JSON.stringify(res));
   return res;
+}
+
+function fetchWorldNameAndDataCenterName(world_name_inline: string, world_name_query: string, all_mode: boolean) {
+  if (world_name_query) {
+    return '';
+  }
+  const world_name = world_name_inline ? world_name_inline : world_name_query;
+  if (!all_mode) {
+    return ' ' + world_name;
+  }
+  const data_center_name = world_center_map.get(servers_map.get(world_name).id).data_center_name;
+  return ' ' + world_name + (data_center_name ? '(' + data_center_name + ')' : '');
 }
 
 export function apply(ctx: Context) {
   ctx.command('查询')
-    .usage('查询 item_name server_name\nitem_name：道具名，可以部分\nserver_name：服务器名，非大区名')
-    .example('查询 失传碎晶 神意之地')
+    .usage('查询 物品名 服务器名 条数 历史条数 \nitem_name：道具名，可以部分\nserver_name：大区名或服务器名或地区')
     .example('查询 英雄失传碎晶 神意之地')
+    .example('查询 英雄失传碎晶 神意之地')
+    .example('查询 英雄失传碎晶 陆行鸟')
+    .example('查询 英雄失传碎晶 中国')
+    .example('查询 英雄失传碎晶 神意之地 5 5')
     ;
   // write your plugin here
-  ctx.command('查询 <item_name> <server_name>')
-    .action((argv, item_name, server_name) => {
+  ctx.command('查询 <item_name> <server_name> [num1:number] [num2:number]')
+    .action((argv, item_name, server_name, num1, num2) => {
+      logger.debug(argv);
+      const _num1 = isInteger((Number)(num1)) && num1 > 0 && num1 <= 10 ? num1 : ctx.config.listing_num;
+      const _num2 = isInteger((Number)(num2)) && num2 > 0 && num2 <= 10 ? num2 : ctx.config.history_num;
       if (!item_name) {
         return '未指定物品名';
       }
       if (!server_name) {
         return '未指定服务器';
       }
-      const server = servers.find((server) => server.name == server_name);
-      if (!server) {
+
+      const servers = [];
+      // 按数据中心查询，如 陆行鸟
+      if (data_center_name_map.has(server_name)) {
+        servers.push({ id: server_name, cn: data_center_name_map.get(server_name) });
+      }
+      // 按地区查询，如 中国
+      else if (region_name_map.has(server_name)) {
+        servers.push({ id: server_name, cn: region_name_map.get(server_name), all_mode: true });
+      }
+      // 按具体服务器查询，如 神意之地
+      else if (servers_map.has(server_name)) {
+        servers.push(servers_map.get(server_name));
+      }
+      if (servers.length == 0) {
         return '服务器不存在';
       }
       if (!argv.session) {
         return '未获取到session';
       }
-      fetchItemId(item_name, ctx).then((item) => {
+      const server: { id: number | string, cn: boolean, all_mode?: boolean } = servers.pop();;
+      fetchItemId(item_name, server.cn, ctx).catch((_) => argv.session.send('发生错误，请联系管理员')).then((item) => {
         if (item) {
-          fetchMarketBoardData(item, server.id, ctx).then((data) => {
+          fetchMarketBoardData(item, server.id, _num1, _num2, ctx).catch((_) => argv.session.send('发生错误，请联系管理员')).then((data) => {
             // 出售列表
             const listings = [...data?.listings]
               .map((value) =>
-                `  ${value.pricePerUnit.toLocaleString()} x ${value.quantity.toLocaleString()}${value.hq ? '(HQ)' : ''} ${value.retainerName} ` +
-                `总价：${value.total.toLocaleString()} 手续费：${value.tax.toLocaleString()} ` +
-                `更新时间：${new Date(value.lastReviewTime * 1000).toLocaleString()}`)
+                `  ${value.pricePerUnit.toLocaleString()} x ${value.quantity.toLocaleString()}${value.hq ? '(HQ)' : ''} ` +
+                `${value.retainerName}${fetchWorldNameAndDataCenterName(value.worldName, data.worldName, server.all_mode)} ` +
+                `总价/手续费：${value.total.toLocaleString()}/${value.tax.toLocaleString()} ` +
+                `时间：${new Date(value.lastReviewTime * 1000).toLocaleString('chinese', { hour12: false })}`)
               .join("\n");
             // 购买历史
             const recent_histroy = [...data?.recentHistory]
               .map((value) =>
-                `  ${value.pricePerUnit.toLocaleString()} x ${value.quantity.toLocaleString()}${value.hq ? '(HQ)' : ''} ${value.buyerName} ` +
+                `  ${value.pricePerUnit.toLocaleString()} x ${value.quantity.toLocaleString()}${value.hq ? '(HQ)' : ''} ` +
+                `${value.buyerName}${fetchWorldNameAndDataCenterName(value.worldName, data.worldName, server.all_mode)} ` +
                 `总价：${value.total.toLocaleString()} ` +
                 `时间：${new Date(value.timestamp * 1000).toLocaleString()}`)
               .join("\n");
             // 输出消息
             const result = `` +
-              (data.worldName ? `服务器：${data.worldName}\n` : ``) +
+              `服务器：${server_name}\n` +
               `物品名称：${item.Name}\n` +
               `价格列表：\n${listings}\n` +
               `购买历史：\n${recent_histroy}\n` +

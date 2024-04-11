@@ -1,4 +1,4 @@
-import { Context, Logger, Schema, Time, mapValues } from 'koishi'
+import { Context, Logger, Schema, isInteger } from 'koishi'
 
 export const name = 'ffxiv-bot-aidon'
 
@@ -48,18 +48,18 @@ async function fetchItemId(item_name: string, cn: boolean, ctx: Context): Promis
 }
 
 // 查询物品市场状态
-async function fetchMarketBoardData(item: any, server_name: number | string, ctx: Context): Promise<any> {
+async function fetchMarketBoardData(item: any, server_name: number | string, ln: number, hn: number, ctx: Context): Promise<any> {
   logger.debug('item: ' + JSON.stringify(item));
   const url = universalis_host + market_board_api_url.replace("{worldDcRegion}", `${server_name}`).replace("{itemIds}", item.ID);
   logger.debug('url: ' + JSON.stringify(url));
   const res = await ctx.http.get(url, {
     params: {
-      listings: 5, // 列表大小
-      entries: 5, // 历史大小
+      listings: ln, // 列表大小
+      entries: hn, // 历史大小
       hq: null, // 是否hq
     }
   });
-  logger.info('fetchMarketBoardData: ' + JSON.stringify(res));
+  logger.debug('fetchMarketBoardData: ' + JSON.stringify(res));
   return res;
 }
 
@@ -77,15 +77,19 @@ function fetchWorldNameAndDataCenterName(world_name_inline: string, world_name_q
 
 export function apply(ctx: Context) {
   ctx.command('查询')
-    .usage('查询 item_name server_name\nitem_name：道具名，可以部分\nserver_name：大区名或服务器名或地区')
-    .example('查询 失传碎晶 神意之地')
+    .usage('查询 物品名 服务器名 条数 历史条数 \nitem_name：道具名，可以部分\nserver_name：大区名或服务器名或地区')
+    .example('查询 英雄失传碎晶 神意之地')
     .example('查询 英雄失传碎晶 神意之地')
     .example('查询 英雄失传碎晶 陆行鸟')
     .example('查询 英雄失传碎晶 中国')
+    .example('查询 英雄失传碎晶 神意之地 5 5')
     ;
   // write your plugin here
-  ctx.command('查询 <item_name> <server_name>')
-    .action((argv, item_name, server_name) => {
+  ctx.command('查询 <item_name> <server_name> [num1:number] [num2:number]')
+    .action((argv, item_name, server_name, num1, num2) => {
+      logger.info(argv);
+      const _num1 = isInteger((Number)(num1)) && num1 > 0 ? num1 : 5;
+      const _num2 = isInteger((Number)(num2)) && num2 > 0 ? num2 : 5;
       if (!item_name) {
         return '未指定物品名';
       }
@@ -115,7 +119,7 @@ export function apply(ctx: Context) {
       const server: { id: number | string, cn: boolean, all_mode?: boolean } = servers.pop();;
       fetchItemId(item_name, server.cn, ctx).catch((_) => argv.session.send('发生错误，请联系管理员')).then((item) => {
         if (item) {
-          fetchMarketBoardData(item, server.id, ctx).catch((_) => argv.session.send('发生错误，请联系管理员')).then((data) => {
+          fetchMarketBoardData(item, server.id, _num1, _num2, ctx).catch((_) => argv.session.send('发生错误，请联系管理员')).then((data) => {
             // 出售列表
             const listings = [...data?.listings]
               .map((value) =>
@@ -128,7 +132,7 @@ export function apply(ctx: Context) {
             const recent_histroy = [...data?.recentHistory]
               .map((value) =>
                 `  ${value.pricePerUnit.toLocaleString()} x ${value.quantity.toLocaleString()}${value.hq ? '(HQ)' : ''} ` +
-                `${value.buyerName} ` +
+                `${value.buyerName}${fetchWorldNameAndDataCenterName(value.worldName, data.worldName, server.all_mode)} ` +
                 `总价：${value.total.toLocaleString()} ` +
                 `时间：${new Date(value.timestamp * 1000).toLocaleString()}`)
               .join("\n");

@@ -2,9 +2,14 @@ import { Context, Logger, Schema, isInteger } from 'koishi'
 
 export const name = 'ffxiv-bot-aidon'
 
-export interface Config { }
+export interface Config {
 
-export const Config: Schema<Config> = Schema.object({})
+}
+
+export const Config: Schema<Config> = Schema.object({
+  listing_num: Schema.number().default(5).min(1).max(10).step(1).description('默认列表条数'),
+  history_num: Schema.number().default(5).min(1).max(10).step(1).description('默认历史条数'),
+})
 
 // universalis api
 const universalis_host = 'https://universalis.app';
@@ -87,9 +92,9 @@ export function apply(ctx: Context) {
   // write your plugin here
   ctx.command('查询 <item_name> <server_name> [num1:number] [num2:number]')
     .action((argv, item_name, server_name, num1, num2) => {
-      logger.info(argv);
-      const _num1 = isInteger((Number)(num1)) && num1 > 0 ? num1 : 5;
-      const _num2 = isInteger((Number)(num2)) && num2 > 0 ? num2 : 5;
+      logger.debug(argv);
+      const _num1 = isInteger((Number)(num1)) && num1 > 0 && num1 <= 10 ? num1 : ctx.config.listing_num;
+      const _num2 = isInteger((Number)(num2)) && num2 > 0 && num2 <= 10 ? num2 : ctx.config.history_num;
       if (!item_name) {
         return '未指定物品名';
       }

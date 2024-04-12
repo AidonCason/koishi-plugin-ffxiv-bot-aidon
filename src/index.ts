@@ -43,8 +43,8 @@ const data_center_server_map_cn = new Map<string, string[]>(data_center_all.filt
 const servers_map = new Map<string, { id: number, cn: boolean }>(servers.map((server) => [server.name, { id: server.id, cn: world_center_map.has(server.id) }]));
 
 
-// 查询物品id
-async function fetchItemId(item_name: string, cn: boolean, ctx: Context): Promise<any> {
+// 查询物品信息
+async function fetchItemInfo(item_name: string, cn: boolean, ctx: Context): Promise<any> {
   const url = (cn ? xivapi_cn_host : xivapi_host) + '/search';
   logger.info('url: ' + JSON.stringify(url));
   const res = await ctx.http.get(url, {
@@ -109,8 +109,7 @@ export function apply(ctx: Context) {
     });
 
   ctx.command('查询 <item_name> <server_name> [num1:number] [num2:number]', '市场物价查询')
-    .usage('查询 物品名 服务器名 条数 历史条数 \nitem_name：道具名，可以部分\nserver_name：大区名或服务器名或地区')
-    .example('查询 英雄失传碎晶 神意之地')
+    .usage('查询 物品名 服务器名 条数 历史条数 \nitem_name：道具名，可以部分\nserver_name：大区名或服务器名或地区\num1：条数，1~10\nnum2：历史条数，1~10')
     .example('查询 英雄失传碎晶 神意之地')
     .example('查询 英雄失传碎晶 陆行鸟')
     .example('查询 英雄失传碎晶 中国')
@@ -146,7 +145,7 @@ export function apply(ctx: Context) {
         return '未获取到session';
       }
       const server: { id: number | string, cn: boolean, all_mode?: boolean } = servers.pop();;
-      fetchItemId(item_name, server.cn, ctx).catch((_) => argv.session.send('发生错误，请联系管理员')).then((item) => {
+      fetchItemInfo(item_name, server.cn, ctx).catch((_) => argv.session.send('发生错误，请联系管理员')).then((item) => {
         if (item) {
           fetchMarketBoardData(item, server.id, _num1, _num2, ctx).catch((_) => argv.session.send('发生错误，请联系管理员')).then((data) => {
             // 出售列表

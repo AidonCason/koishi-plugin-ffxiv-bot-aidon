@@ -94,7 +94,7 @@ export function apply(ctx: Context) {
   ctx.command('查询服务器列表 [data_center_name]', '服务器列表查询')
     .usage('data_center_name：大区名\n可以指定大区，如 查询服务器列表 陆行鸟，不指定默认查询所有服务器')
     .action((_, data_center_name) => {
-      if (data_center_names_cn.indexOf(data_center_name) < 0) {
+      if (data_center_name && data_center_names_cn.indexOf(data_center_name) < 0) {
         return `大区名错误，` + `可查询的大区列表如下：${data_center_names_cn.join('，')}`
       }
       const str = [...data_center_server_map_cn.entries()].map(entry => {

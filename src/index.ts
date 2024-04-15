@@ -6,6 +6,24 @@ export interface Config {
 
 }
 
+declare module 'koishi' {
+  interface Tables {
+    ffxiv_bot_aidon_default_server: DefaultServerTable
+  }
+}
+
+// 这里是新增表的接口类型
+export interface DefaultServerTable {
+  id: number,
+  targetId: string, // channelId
+  targetType: number, // 0 群，频道；1 私聊；
+  default_server: string,
+  created_at: Date,
+  created_by: string,
+  updated_at: Date,
+  updated_by: string,
+}
+
 export const Config: Schema<Config> = Schema.object({
   listing_num: Schema.number().default(5).min(1).max(10).step(1).description('默认列表条数'),
   history_num: Schema.number().default(5).min(1).max(10).step(1).description('默认历史条数'),
@@ -85,8 +103,90 @@ function fetchWorldNameAndDataCenterName(world_name_inline: string, world_name_q
   return ' ' + world_name + (data_center_name ? '(' + data_center_name + ')' : '');
 }
 
+
+function fetchServer(server_name: string) {
+  const servers = [];
+  // 按数据中心查询，如 陆行鸟
+  if (data_center_name_map.has(server_name)) {
+    servers.push({ id: server_name, cn: data_center_name_map.get(server_name) });
+  }
+  // 按地区查询，如 中国
+  else if (region_name_map.has(server_name)) {
+    servers.push({ id: server_name, cn: region_name_map.get(server_name), all_mode: true });
+  }
+  // 按具体服务器查询，如 神意之地
+  else if (servers_map.has(server_name)) {
+    servers.push(servers_map.get(server_name));
+  }
+  return servers
+}
+
 export function apply(ctx: Context) {
+  // create table
+  ctx.model.extend('ffxiv_bot_aidon_default_server', {
+    'id': 'unsigned',
+    'targetId': 'string', // channelId
+    'targetType': 'unsigned', // 0 群，频道；1 私聊；
+    'default_server': 'string',
+    'created_at': 'timestamp',
+    'created_by': 'string',
+    'updated_at': 'timestamp',
+    'updated_by': 'string',
+  }, {
+    primary: 'id',
+    unique: ['targetId'],
+    foreign: null,
+    autoInc: true
+  });
+
   // write your plugin here
+  ctx.command('设置默认服务器 <server_name>', '为当前群聊/频道设置默认服务器')
+    .usage('设置默认服务器，已设置过则变成修改')
+    .action((argv, server_name) => {
+      logger.debug(argv);
+      if (!argv.session) {
+        return '未获取到session';
+      }
+      const servers = fetchServer(server_name);
+      if (servers.length == 0) {
+        return '服务器不存在';
+      }
+      logger.info(argv.session.channelId);
+      ctx.database.get('ffxiv_bot_aidon_default_server', { targetId: { $eq: argv.session.channelId } }).then((record) => {
+        if (!record[0]) {// insert
+          ctx.database.create('ffxiv_bot_aidon_default_server', {
+            // id: -1, //auto
+            targetId: argv.session.channelId,
+            targetType: 0,
+            default_server: JSON.stringify(servers[0]),
+            created_at: new Date(),
+            created_by: argv.session.event?.user?.id,
+            updated_at: new Date(),
+            updated_by: argv.session.event?.user?.id,
+          }).then(_ => {
+            argv.session.send(`成功设置 ${server_name} 为默认服务器`);
+          }).catch(_ => {
+            argv.session.send('发生错误，请联系管理员');
+          });
+        } else { // update
+          if (servers[0].id === JSON.parse(record[0].default_server).id) { // no change
+            argv.session.send(`当前 ${server_name} 为默认服务器，无需修改`);
+          } else { // perform change
+            ctx.database.upsert('ffxiv_bot_aidon_default_server', _ => [{
+              ...record[0],
+              default_server: JSON.stringify(servers[0]),
+              updated_at: new Date(),
+              updated_by: argv.session.event?.user?.id,
+            }]).then(_ => {
+              argv.session.send(`成功修改 ${server_name} 为默认服务器`);
+            }).catch(_ => {
+              argv.session.send('发生错误，请联系管理员');
+            });
+          }
+        }
+      }).catch(_ => { argv.session.send('发生错误，请联系管理员'); });
+    });
+
   ctx.command('查询大区列表', '大区列表查询')
     .usage('返回可用的大区列表')
     .action((_) => `可查询的大区列表如下：中国，${data_center_names_cn.join('，')}`);
@@ -128,19 +228,7 @@ export function apply(ctx: Context) {
         return '未指定服务器';
       }
 
-      const servers = [];
-      // 按数据中心查询，如 陆行鸟
-      if (data_center_name_map.has(server_name)) {
-        servers.push({ id: server_name, cn: data_center_name_map.get(server_name) });
-      }
-      // 按地区查询，如 中国
-      else if (region_name_map.has(server_name)) {
-        servers.push({ id: server_name, cn: region_name_map.get(server_name), all_mode: true });
-      }
-      // 按具体服务器查询，如 神意之地
-      else if (servers_map.has(server_name)) {
-        servers.push(servers_map.get(server_name));
-      }
+      const servers = fetchServer(server_name);
       if (servers.length == 0) {
         return '服务器不存在';
       }

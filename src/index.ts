@@ -218,7 +218,7 @@ export function apply(ctx: Context) {
     });
 
   ctx.command('查询 <item_name> <server_name> [num1:number] [num2:number]', '市场物价查询')
-    .usage('查询 物品名 服务器名 条数 历史条数 \nitem_name：道具名，可以部分\nserver_name：大区名或服务器名或地区\num1：条数，1~10\nnum2：历史条数，1~10')
+    .usage('查询 物品名 服务器名 条数 历史条数 \nitem_name：道具名，可以部分\nserver_name：大区名或服务器名或地区，设置了默认服务器的情况下可以省略(当前channel)\num1：条数，1~10\nnum2：历史条数，1~10')
     .example('查询 英雄失传碎晶 神意之地')
     .example('查询 英雄失传碎晶 陆行鸟')
     .example('查询 英雄失传碎晶 中国')

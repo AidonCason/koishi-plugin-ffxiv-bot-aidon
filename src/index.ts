@@ -1,6 +1,9 @@
 import { Context, Logger, Schema, isInteger } from 'koishi'
 
 export const name = 'ffxiv-bot-aidon'
+export const inject = {
+  optional: ['database']
+}
 
 export interface Config {
 
@@ -150,6 +153,9 @@ export function apply(ctx: Context) {
       if (!argv.session) {
         return '未获取到session';
       }
+      if (!ctx.database) {
+        return '需要设置数据库以支持该操作';
+      }
       const servers = fetchServer(server_name);
       if (servers.length == 0) {
         return '服务器不存在';
@@ -262,15 +268,19 @@ export function apply(ctx: Context) {
           argv.session.send('未查询到任何物品，请检查输入的物品名称');
         }
       });
-      if (!server_name) {
-        fetchServerDB(argv.session.channelId, ctx).then((server) => {
-          if (!server) {
-            argv.session.send('未指定服务器，且无默认服务器');
-          } else {
-            fn(server);
-          }
-        }).catch((_) => argv.session.send('发生错误，请联系管理员'));
-      } else {
+      if (!server_name) {// 未提供服务器，尝试默认
+        if (!ctx.database) {
+          return '未指定服务器，且无默认服务器';
+        } else {
+          fetchServerDB(argv.session.channelId, ctx).then((server) => {
+            if (!server) {
+              argv.session.send('未指定服务器，且无默认服务器');
+            } else {
+              fn(server);
+            }
+          }).catch((_) => argv.session.send('发生错误，请联系管理员'));
+        }
+      } else {// 指名了服务器
         const servers = fetchServer(server_name);
         if (servers.length == 0) {
           return '服务器不存在';

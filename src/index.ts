@@ -64,7 +64,7 @@ const servers_map = new Map<string, { id: number, cn: boolean }>(servers.map((se
 // 查询物品信息
 async function fetchItemInfo(item_name: string, cn: boolean, ctx: Context): Promise<any> {
   const url = (cn ? xivapi_cn_host : xivapi_host) + '/search';
-  logger.info('url: ' + JSON.stringify(url));
+  logger.debug('url: ' + JSON.stringify(url));
   const res = await ctx.http.get(url, {
     params: {
       indexes: 'Item', // 固定，搜索物品
@@ -103,20 +103,23 @@ function fetchWorldNameAndDataCenterName(world_name_inline: string, world_name_q
   return ' ' + world_name + (data_center_name ? '(' + data_center_name + ')' : '');
 }
 
+async function fetchServerDB(targetId: string, ctx: Context) {
+  return JSON.parse((await ctx.database.get('ffxiv_bot_aidon_default_server', { targetId: { $eq: targetId } }))[0].default_server);
+}
 
 function fetchServer(server_name: string) {
   const servers = [];
   // 按数据中心查询，如 陆行鸟
   if (data_center_name_map.has(server_name)) {
-    servers.push({ id: server_name, cn: data_center_name_map.get(server_name) });
+    servers.push({ id: server_name, name: server_name, cn: data_center_name_map.get(server_name) });
   }
   // 按地区查询，如 中国
   else if (region_name_map.has(server_name)) {
-    servers.push({ id: server_name, cn: region_name_map.get(server_name), all_mode: true });
+    servers.push({ id: server_name, name: server_name, cn: region_name_map.get(server_name), all_mode: true });
   }
   // 按具体服务器查询，如 神意之地
   else if (servers_map.has(server_name)) {
-    servers.push(servers_map.get(server_name));
+    servers.push({ ...servers_map.get(server_name), name: server_name });
   }
   return servers
 }
@@ -151,7 +154,7 @@ export function apply(ctx: Context) {
       if (servers.length == 0) {
         return '服务器不存在';
       }
-      logger.info(argv.session.channelId);
+      logger.debug(argv.session.channelId);
       ctx.database.get('ffxiv_bot_aidon_default_server', { targetId: { $eq: argv.session.channelId } }).then((record) => {
         if (!record[0]) {// insert
           ctx.database.create('ffxiv_bot_aidon_default_server', {
@@ -224,16 +227,7 @@ export function apply(ctx: Context) {
       if (!item_name) {
         return '未指定物品名';
       }
-      if (!server_name) {
-        return '未指定服务器';
-      }
-
-      const servers = fetchServer(server_name);
-      if (servers.length == 0) {
-        return '服务器不存在';
-      }
-      const server: { id: number | string, cn: boolean, all_mode?: boolean } = servers.pop();;
-      fetchItemInfo(item_name, server.cn, ctx).catch((_) => argv.session.send('发生错误，请联系管理员')).then((item) => {
+      const fn = (server) => fetchItemInfo(item_name, server.cn, ctx).catch((_) => argv.session.send('发生错误，请联系管理员')).then((item) => {
         if (item) {
           fetchMarketBoardData(item, server.id, _num1, _num2, ctx).catch((_) => argv.session.send('发生错误，请联系管理员')).then((data) => {
             // 出售列表
@@ -254,7 +248,7 @@ export function apply(ctx: Context) {
               .join("\n");
             // 输出消息
             const result = `` +
-              `服务器：${server_name}\n` +
+              `服务器：${server.name}\n` +
               `物品名称：${item.Name}\n` +
               `价格列表：\n${listings}\n` +
               `购买历史：\n${recent_histroy}\n` +
@@ -268,5 +262,21 @@ export function apply(ctx: Context) {
           argv.session.send('未查询到任何物品，请检查输入的物品名称');
         }
       });
+      if (!server_name) {
+        fetchServerDB(argv.session.channelId, ctx).then((server) => {
+          if (!server) {
+            argv.session.send('未指定服务器，且无默认服务器');
+          } else {
+            fn(server);
+          }
+        }).catch((_) => argv.session.send('发生错误，请联系管理员'));
+      } else {
+        const servers = fetchServer(server_name);
+        if (servers.length == 0) {
+          return '服务器不存在';
+        }
+        const server: { id: number | string, cn: boolean, all_mode?: boolean } = servers.pop();
+        fn(server);
+      }
     });
 }

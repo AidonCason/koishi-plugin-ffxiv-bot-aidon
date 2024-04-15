@@ -116,6 +116,9 @@ export function apply(ctx: Context) {
     .example('查询 英雄失传碎晶 神意之地 5 5')
     .action((argv, item_name, server_name, num1, num2) => {
       logger.debug(argv);
+      if (!argv.session) {
+        return '未获取到session';
+      }
       const _num1 = isInteger((Number)(num1)) && num1 > 0 && num1 <= 10 ? num1 : ctx.config.listing_num;
       const _num2 = isInteger((Number)(num2)) && num2 > 0 && num2 <= 10 ? num2 : ctx.config.history_num;
       if (!item_name) {
@@ -140,9 +143,6 @@ export function apply(ctx: Context) {
       }
       if (servers.length == 0) {
         return '服务器不存在';
-      }
-      if (!argv.session) {
-        return '未获取到session';
       }
       const server: { id: number | string, cn: boolean, all_mode?: boolean } = servers.pop();;
       fetchItemInfo(item_name, server.cn, ctx).catch((_) => argv.session.send('发生错误，请联系管理员')).then((item) => {

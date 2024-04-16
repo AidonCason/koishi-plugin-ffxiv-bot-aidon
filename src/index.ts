@@ -127,6 +127,8 @@ function fetchServer(server_name: string) {
   return servers
 }
 
+const pvp_field_cn = ['昂萨哈凯尔（竞争战）', '尘封秘岩（争夺战）', '荣誉野（碎冰战）'];
+const start_time_stamp = 1713193200_000;
 export function apply(ctx: Context) {
   // create table
   ctx.model.extend('ffxiv_bot_aidon_default_server', {
@@ -146,6 +148,12 @@ export function apply(ctx: Context) {
   });
 
   // write your plugin here
+  ctx.command('战场', '查询战场轮换信息')
+    .action((_) => {
+      const cur = Math.floor((new Date().getTime() - start_time_stamp) / 86400_000) % 3;
+      return `今日战场：${pvp_field_cn[cur]}\n明日战场：${pvp_field_cn[(cur + 1) % 3]}\n后日战场：${pvp_field_cn[(cur + 2) % 3]}`;
+    });
+
   ctx.command('设置默认服务器 <server_name>', '为当前群聊/频道设置默认服务器')
     .usage('设置默认服务器，已设置过则变成修改')
     .action((argv, server_name) => {

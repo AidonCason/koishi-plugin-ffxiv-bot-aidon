@@ -1,4 +1,5 @@
 import { Context, Logger, Schema, isInteger } from 'koishi'
+import { } from '@koishijs/plugin-adapter-qq';
 
 export const name = 'ffxiv-bot-aidon'
 export const inject = {
@@ -30,6 +31,7 @@ export interface DefaultServerTable {
 export const Config: Schema<Config> = Schema.object({
   listing_num: Schema.number().default(5).min(1).max(10).step(1).description('默认列表条数'),
   history_num: Schema.number().default(5).min(1).max(10).step(1).description('默认历史条数'),
+  use_markdown_qq: Schema.boolean().default(false).description('使用markdown模板发送部分消息，目前仅支持qq').experimental(),
 })
 
 // universalis api
@@ -149,9 +151,28 @@ export function apply(ctx: Context) {
 
   // write your plugin here
   ctx.command('战场', '查询战场轮换信息')
-    .action((_) => {
+    .action((argv) => {
+      if (!argv.session) {
+        return '未获取到session';
+      }
       const cur = Math.floor((new Date().getTime() - start_time_stamp) / 86400_000) % 3;
-      return `今日战场：${pvp_field_cn[cur]}\n明日战场：${pvp_field_cn[(cur + 1) % 3]}\n后日战场：${pvp_field_cn[(cur + 2) % 3]}`;
+      if (ctx.config.use_markdown_qq && argv.session.qq) {
+        const data = {
+          msg_type: 2, // 2 markdown
+          markdown: {
+            content:
+              `### 战场  \n` +
+              `***  \n` +
+              `- 今日战场：${pvp_field_cn[cur]}  \n` +
+              `- 明日战场：${pvp_field_cn[(cur + 1) % 3]}  \n` +
+              `- 后日战场：${pvp_field_cn[(cur + 2) % 3]}  \n` +
+              ``
+          }
+        };
+        argv.session.qq.sendMessage(argv.session.channelId, data);
+      } else {
+        return `今日战场：${pvp_field_cn[cur]}\n明日战场：${pvp_field_cn[(cur + 1) % 3]}\n后日战场：${pvp_field_cn[(cur + 2) % 3]}`;
+      }
     });
 
   ctx.command('设置默认服务器 <server_name>', '为当前群聊/频道设置默认服务器')

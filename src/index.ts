@@ -28,10 +28,12 @@ export interface DefaultServerTable {
   updated_by: string,
 }
 
+const locale_defualt = 'zh-CN';
 export const Config: Schema<Config> = Schema.object({
   listing_num: Schema.number().default(5).min(1).max(10).step(1).description('默认列表条数'),
   history_num: Schema.number().default(5).min(1).max(10).step(1).description('默认历史条数'),
   use_markdown_qq: Schema.boolean().default(false).description('使用markdown模板发送部分消息，目前仅支持qq').experimental(),
+  templdate_id_pvp_qq: Schema.string().description('战场信息用的模板id，对应在qq后台申请的'),
 })
 
 // universalis api
@@ -149,29 +151,43 @@ export function apply(ctx: Context) {
     autoInc: true
   });
 
+
+  ctx.i18n.define('zh-CN', {
+    "1": "周一",
+    "2": "周二",
+    "3": "周三",
+    "4": "周四",
+    "5": "周五",
+    "6": "周六",
+    "7": "周日",
+  });
+  const locale_now = locale_defualt;
+
   // write your plugin here
   ctx.command('战场', '查询战场轮换信息')
     .action((argv) => {
       if (!argv.session) {
         return '未获取到session';
       }
+      const date = new Date(argv.session.event.timestamp);
+      const date_str = `${date.toLocaleDateString(locale_now)} ${ctx.i18n.get(date.getDay().toString())[locale_now]}`;
       const cur = Math.floor((new Date().getTime() - start_time_stamp) / 86400_000) % 3;
-      if (ctx.config.use_markdown_qq && argv.session.qq) {
+      if (ctx.config.use_markdown_qq && ctx.config.templdate_id_pvp_qq && argv.session.qq) {
         const data = {
           msg_type: 2, // 2 markdown
           markdown: {
-            content:
-              `### 战场  \n` +
-              `***  \n` +
-              `- 今日战场：${pvp_field_cn[cur]}  \n` +
-              `- 明日战场：${pvp_field_cn[(cur + 1) % 3]}  \n` +
-              `- 后日战场：${pvp_field_cn[(cur + 2) % 3]}  \n` +
-              ``
+            custom_template_id: ctx.config.templdate_id_pvp_qq,
+            params: [
+              { "key": "date", values: [date_str] },
+              { "key": "data1", values: [pvp_field_cn[cur]] },
+              { "key": "data2", values: [pvp_field_cn[(cur + 1) % 3]] },
+              { "key": "data3", values: [pvp_field_cn[(cur + 2) % 3]] },
+            ]
           }
         };
         argv.session.qq.sendMessage(argv.session.channelId, data);
       } else {
-        return `今日战场：${pvp_field_cn[cur]}\n明日战场：${pvp_field_cn[(cur + 1) % 3]}\n后日战场：${pvp_field_cn[(cur + 2) % 3]}`;
+        return `今日：${date_str}\n今日战场：${pvp_field_cn[cur]}\n明日战场：${pvp_field_cn[(cur + 1) % 3]}\n后日战场：${pvp_field_cn[(cur + 2) % 3]}`;
       }
     });
 
@@ -268,18 +284,18 @@ export function apply(ctx: Context) {
             // 出售列表
             const listings = [...data?.listings]
               .map((value) =>
-                `  ${value.pricePerUnit.toLocaleString()} x ${value.quantity.toLocaleString()}${value.hq ? '(HQ)' : ''} ` +
+                `  ${value.pricePerUnit.toLocaleString(locale_now)} x ${value.quantity.toLocaleString(locale_now)}${value.hq ? '(HQ)' : ''} ` +
                 `${value.retainerName}${fetchWorldNameAndDataCenterName(value.worldName, data.worldName, server.all_mode)} ` +
-                `总价/手续费：${value.total.toLocaleString()}/${value.tax.toLocaleString()} ` +
-                `时间：${new Date(value.lastReviewTime * 1000).toLocaleString('zh-CN', { hour12: false })}`)
+                `总价/手续费：${value.total.toLocaleString(locale_now)}/${value.tax.toLocaleString(locale_now)} ` +
+                `时间：${new Date(value.lastReviewTime * 1000).toLocaleString(locale_now, { hour12: false })}`)
               .join("\n");
             // 购买历史
             const recent_histroy = [...data?.recentHistory]
               .map((value) =>
-                `  ${value.pricePerUnit.toLocaleString()} x ${value.quantity.toLocaleString()}${value.hq ? '(HQ)' : ''} ` +
+                `  ${value.pricePerUnit.toLocaleString(locale_now)} x ${value.quantity.toLocaleString(locale_now)}${value.hq ? '(HQ)' : ''} ` +
                 `${value.buyerName}${fetchWorldNameAndDataCenterName(value.worldName, data.worldName, server.all_mode)} ` +
-                `总价：${value.total.toLocaleString()} ` +
-                `时间：${new Date(value.timestamp * 1000).toLocaleString('zh-CN', { hour12: false })}`)
+                `总价：${value.total.toLocaleString(locale_now)} ` +
+                `时间：${new Date(value.timestamp * 1000).toLocaleString(locale_now, { hour12: false })}`)
               .join("\n");
             // 输出消息
             const result = `` +
@@ -287,9 +303,9 @@ export function apply(ctx: Context) {
               `物品名称：${item.Name}\n` +
               `价格列表：\n${listings}\n` +
               `购买历史：\n${recent_histroy}\n` +
-              `平均价NQ：${data.currentAveragePriceNQ.toLocaleString()} / ` + `HQ：${data.currentAveragePriceHQ.toLocaleString()}\n` +
-              `最低价NQ：${data.minPriceNQ.toLocaleString()} / ` + `HQ：${data.minPriceHQ.toLocaleString()}\n` +
-              `最高价NQ：${data.maxPriceNQ.toLocaleString()} / ` + `HQ：${data.maxPriceHQ.toLocaleString()}\n` +
+              `平均价NQ：${data.currentAveragePriceNQ.toLocaleString(locale_now)} / ` + `HQ：${data.currentAveragePriceHQ.toLocaleString(locale_now)}\n` +
+              `最低价NQ：${data.minPriceNQ.toLocaleString(locale_now)} / ` + `HQ：${data.minPriceHQ.toLocaleString(locale_now)}\n` +
+              `最高价NQ：${data.maxPriceNQ.toLocaleString(locale_now)} / ` + `HQ：${data.maxPriceHQ.toLocaleString(locale_now)}\n` +
               '';
             argv.session.send(result);
           });

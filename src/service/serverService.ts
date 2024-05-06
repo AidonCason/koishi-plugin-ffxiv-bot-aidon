@@ -137,54 +137,60 @@ const setDefaultServerHandler = (
     .get('ffxiv_bot_aidon_default_server', {
       targetId: { $eq: argv.session.channelId }
     })
-    .then(record => {
-      if (!record[0]) {
-        // insert
-        ctx.database
-          .create('ffxiv_bot_aidon_default_server', {
-            // id: -1, //auto
-            targetId: argv.session.channelId,
-            targetType: 0,
-            default_server: JSON.stringify(servers[0]),
-            created_at: new Date(),
-            created_by: argv.session.event?.user?.id,
-            updated_at: new Date(),
-            updated_by: argv.session.event?.user?.id
-          })
-          .then(() => {
-            argv.session.send(`成功设置 ${server_name} 为默认服务器`);
-          })
-          .catch(() => {
-            argv.session.send('发生错误，请联系管理员');
-          });
-      } else {
-        // update
-        if (servers[0].id === JSON.parse(record[0].default_server).id) {
-          // no change
-          argv.session.send(`当前 ${server_name} 为默认服务器，无需修改`);
-        } else {
-          // perform change
+    .then(
+      record => {
+        if (!record[0]) {
+          // insert
           ctx.database
-            .upsert('ffxiv_bot_aidon_default_server', () => [
-              {
-                ...record[0],
-                default_server: JSON.stringify(servers[0]),
-                updated_at: new Date(),
-                updated_by: argv.session.event?.user?.id
-              }
-            ])
-            .then(() => {
-              argv.session.send(`成功修改 ${server_name} 为默认服务器`);
+            .create('ffxiv_bot_aidon_default_server', {
+              // id: -1, //auto
+              targetId: argv.session.channelId,
+              targetType: 0,
+              default_server: JSON.stringify(servers[0]),
+              created_at: new Date(),
+              created_by: argv.session.event?.user?.id,
+              updated_at: new Date(),
+              updated_by: argv.session.event?.user?.id
             })
-            .catch(() => {
-              argv.session.send('发生错误，请联系管理员');
-            });
+            .then(
+              () => {
+                argv.session.send(`成功设置 ${server_name} 为默认服务器`);
+              },
+              () => {
+                argv.session.send('发生错误，请联系管理员');
+              }
+            );
+        } else {
+          // update
+          if (servers[0].id === JSON.parse(record[0].default_server).id) {
+            // no change
+            argv.session.send(`当前 ${server_name} 为默认服务器，无需修改`);
+          } else {
+            // perform change
+            ctx.database
+              .upsert('ffxiv_bot_aidon_default_server', () => [
+                {
+                  ...record[0],
+                  default_server: JSON.stringify(servers[0]),
+                  updated_at: new Date(),
+                  updated_by: argv.session.event?.user?.id
+                }
+              ])
+              .then(
+                () => {
+                  argv.session.send(`成功修改 ${server_name} 为默认服务器`);
+                },
+                () => {
+                  argv.session.send('发生错误，请联系管理员');
+                }
+              );
+          }
         }
+      },
+      () => {
+        argv.session.send('发生错误，请联系管理员');
       }
-    })
-    .catch(() => {
-      argv.session.send('发生错误，请联系管理员');
-    });
+    );
 };
 
 const getDataCentersHandler = () => {

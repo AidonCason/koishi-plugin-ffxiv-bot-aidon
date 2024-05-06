@@ -1,13 +1,7 @@
 import { Argv, Context } from 'koishi';
 import { locale_settings } from '../utils/locale';
 import { Config } from '../config/settings';
-
-const pvp_field_cn = [
-  '昂萨哈凯尔（竞争战）',
-  '尘封秘岩（争夺战）',
-  '荣誉野（碎冰战）'
-];
-const start_time_stamp = 1713193200_000;
+import { pvp_field_cn, pvp_start_time_stamp } from '../constant/pvp';
 
 const getBattleFieldInfoHandler = (
   ctx: Context,
@@ -20,7 +14,7 @@ const getBattleFieldInfoHandler = (
   const date = new Date(argv.session.event.timestamp);
   const date_str = `${date.toLocaleDateString(locale_settings.current)} ${ctx.i18n.get(date.getDay().toString())[locale_settings.current]}`;
   const cur =
-    Math.floor((new Date().getTime() - start_time_stamp) / 86400_000) % 3;
+    Math.floor((new Date().getTime() - pvp_start_time_stamp) / 86400_000) % 3;
   if (config.use_markdown_qq && config.templdate_id_pvp_qq && argv.session.qq) {
     const data = {
       msg_type: 2, // 2 markdown

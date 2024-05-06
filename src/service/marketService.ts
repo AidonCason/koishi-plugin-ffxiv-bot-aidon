@@ -2,27 +2,60 @@ import logger from '../utils/logger';
 import { Argv, Context, isInteger } from 'koishi';
 import { universalis_host, market_board_api_url } from '../constant/urls';
 import { locale_settings } from '../utils/locale';
-import { fetchItemInfo } from './itemService';
+import { Item, fetchItemInfo } from './itemService';
 import {
   fetchWorldNameAndDataCenterName,
   fetchServerDB,
   fetchServer
 } from './serverService';
 
+interface MarketBoardDataListing {
+  pricePerUnit?: number;
+  quantity?: number;
+  hq?: boolean;
+  retainerName?: string;
+  worldName?: string;
+  total?: number;
+  tax?: number;
+  lastReviewTime?: number;
+}
+
+interface MarketBoardDataRecentHistory {
+  pricePerUnit?: number;
+  quantity?: number;
+  hq?: boolean;
+  buyerName?: string;
+  worldName?: string;
+  total?: number;
+  timestamp?: number;
+}
+
+interface MarketBoardData {
+  worldName?: string;
+  minPriceNQ?: number;
+  maxPriceNQ?: number;
+  minPriceHQ?: number;
+  maxPriceHQ?: number;
+  currentAveragePriceNQ?: number;
+  currentAveragePriceHQ?: number;
+  recentHistory?: MarketBoardDataRecentHistory[];
+  listings?: MarketBoardDataListing[];
+}
+
 // 查询物品市场状态
 async function fetchMarketBoardData(
-  item: unknown,
+  item: Item,
   server_name: number | string,
   ln: number,
   hn: number,
   ctx: Context
-): Promise<unknown> {
+): Promise<MarketBoardData> {
   logger.debug('item: ' + JSON.stringify(item));
   const url =
     universalis_host +
     market_board_api_url
       .replace('{worldDcRegion}', `${server_name}`)
-      .replace('{itemIds}', item.ID);
+      .replace('{itemIds}', '' + item.ID);
   logger.debug('url: ' + JSON.stringify(url));
   const res = await ctx.http.get(url, {
     params: {
@@ -59,13 +92,11 @@ const getMarketBoardDataHandler = (
     return '未指定物品名';
   }
   const fn = server =>
-    fetchItemInfo(item_name, server.cn, ctx)
-      .catch(() => argv.session.send('发生错误，请联系管理员'))
-      .then(item => {
+    fetchItemInfo(item_name, server.cn, ctx).then(
+      item => {
         if (item) {
-          fetchMarketBoardData(item, server.id, _num1, _num2, ctx)
-            .catch(() => argv.session.send('发生错误，请联系管理员'))
-            .then(data => {
+          fetchMarketBoardData(item as Item, server.id, _num1, _num2, ctx).then(
+            data => {
               // 出售列表
               const listings = [...data.listings]
                 .map(
@@ -101,25 +132,30 @@ const getMarketBoardDataHandler = (
                 `HQ：${data.maxPriceHQ.toLocaleString(locale_settings.current)}\n` +
                 '';
               argv.session.send(result);
-            });
+            },
+            () => argv.session.send('发生错误，请联系管理员')
+          );
         } else {
           argv.session.send('未查询到任何物品，请检查输入的物品名称');
         }
-      });
+      },
+      () => argv.session.send('发生错误，请联系管理员')
+    );
   if (!server_name) {
     // 未提供服务器，尝试默认
     if (!ctx.database) {
       return '未指定服务器，且无默认服务器';
     } else {
-      fetchServerDB(argv.session.channelId, ctx)
-        .then(server => {
+      fetchServerDB(argv.session.channelId, ctx).then(
+        server => {
           if (!server) {
             argv.session.send('未指定服务器，且无默认服务器');
           } else {
             fn(server);
           }
-        })
-        .catch(() => argv.session.send('发生错误，请联系管理员'));
+        },
+        () => argv.session.send('发生错误，请联系管理员')
+      );
     }
   } else {
     // 指名了服务器

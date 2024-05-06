@@ -17,6 +17,9 @@ export const inject = {
   optional: ['database']
 };
 
+// 重新导出配置
+export * from './config/settings';
+
 export function apply(ctx: Context, config: Config) {
   // create table
   ctx.model.extend(

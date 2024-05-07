@@ -18,7 +18,6 @@ const getBattleFieldInfoHandler = (
   if (config.use_markdown_qq && config.templdate_id_pvp_qq && argv.session.qq) {
     const data = {
       msg_type: 2, // 2 markdown
-      content: '',
       markdown: {
         custom_template_id: config.templdate_id_pvp_qq,
         params: [

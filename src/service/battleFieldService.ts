@@ -16,9 +16,15 @@ const getBattleFieldInfoHandler = (
   const date_str = `${date.toLocaleDateString(locale_settings.current)} ${ctx.i18n.get(date.getDay().toString())[locale_settings.current]}`;
   const cur =
     Math.floor((new Date().getTime() - pvp_start_time_stamp) / 86400_000) % 3;
-  if (config.use_markdown_qq && config.templdate_id_pvp_qq && argv.session.qq) {
+  if (
+    config.use_markdown_qq &&
+    config.templdate_id_pvp_qq &&
+    argv.session.qq &&
+    argv.session.messageId
+  ) {
     const data = {
       msg_type: 2, // 2 markdown
+      msg_id: argv.session.messageId,
       markdown: {
         custom_template_id: config.templdate_id_pvp_qq,
         params: [
@@ -31,10 +37,10 @@ const getBattleFieldInfoHandler = (
     };
     argv.session.qq.sendMessage(argv.session.channelId, data).then(
       res => {
-        logger.info(res);
+        logger.info('qq.sendMessage res: %s', res);
       },
       err => {
-        logger.error(err);
+        logger.error('qq.sendMessage error: %s', err);
       }
     );
   } else {

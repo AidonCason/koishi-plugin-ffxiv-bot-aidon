@@ -37,10 +37,10 @@ const getBattleFieldInfoHandler = (
     };
     argv.session.qq.sendMessage(argv.session.channelId, data).then(
       res => {
-        logger.info('qq.sendMessage res: %s', res);
+        logger.info('qq.sendMessage res: %o', res);
       },
       err => {
-        logger.error('qq.sendMessage error: %s', err);
+        logger.error('qq.sendMessage error: %o', err);
       }
     );
   } else {

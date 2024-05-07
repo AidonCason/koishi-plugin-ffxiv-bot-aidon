@@ -29,9 +29,14 @@ const getBattleFieldInfoHandler = (
         ]
       }
     };
-    argv.session.qq.sendMessage(argv.session.channelId, data).catch(err => {
-      logger.error(err);
-    });
+    argv.session.qq.sendMessage(argv.session.channelId, data).then(
+      res => {
+        logger.info(res);
+      },
+      err => {
+        logger.error(err);
+      }
+    );
   } else {
     return `今日：${date_str}\n今日战场：${pvp_field_cn[cur]}\n明日战场：${pvp_field_cn[(cur + 1) % 3]}\n后日战场：${pvp_field_cn[(cur + 2) % 3]}`;
   }
